@@ -1,0 +1,52 @@
+import socket
+import multiprocessing
+class HTTPServer(object):
+    def __init__(self):
+        server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        server_socket.bind(("", 8080))
+        server_socket.listen(128)
+        self.server_socket = server_socket
+
+    def requse_data(self, clinet_socket):
+        recv_data = clinet_socket.recv(4096)
+        if not recv_data:
+            print("客户端已经关闭，连接中断")
+            clinet_socket.close()
+            return
+        recv_str_data = recv_data.decode()
+        data_list = recv_str_data.split("\r\n")
+        data1_list = data_list[0]
+        path_info = data1_list.split(" ")[1]
+        if path_info == "/":
+            path_info = "/index.html"
+        try:
+            with open("./static" + path_info, "rb") as file:
+                file_data = file.read()
+        except Exception as e:
+            response_line = "HTTP/1.1 404 Not Found\r\n"
+            response_header = "Server: PythonServer1.0\r\n"
+            response_body = "Error"
+            response_data = response_line + response_header + "\r\n" + response_body
+            clinet_socket.send(response_data.encode())
+        else:
+            response_line = "HTTP/1.1 200 ok\r\n"
+            response_header = "Server:PythonServer2.0\r\n"
+            response_body = file_data
+            response_data = (response_line + response_header + "\r\n").encode() + response_body
+            clinet_socket.send(response_data)
+        finally:
+            clinet_socket.close()
+
+    def Start(self):
+        while True:
+            clinet_socket, clinet_addr = self.server_socket.accept()
+            print("接收到来自%s的请求" % str(clinet_addr))
+            pro = multiprocessing.Process(target=self.requse_data, args=(clinet_socket,))
+            pro.start()
+            clinet_socket.close()
+
+
+if __name__ == '__main__':
+    http_server = HTTPServer()
+    http_server.Start()
